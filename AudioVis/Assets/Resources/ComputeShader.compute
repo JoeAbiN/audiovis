@@ -1,0 +1,175 @@
+#pragma kernel CSMain
+
+float4x4 camToWorld;
+float4x4 camInvProj;
+
+int shapeIndex;
+
+float time;
+float3 light;
+float freq;
+float spectrumMax;
+
+RWTexture2D<float4> res;
+
+struct Ray {
+    float3 origin;
+    float3 direction;
+};
+
+Ray newRay(float3 origin, float3 direction) {
+    Ray ray;
+    ray.origin = origin;
+    ray.direction = direction;
+
+    return ray;
+}
+
+Ray newCamRay(float2 uv) {
+    // Transform the camera origin to world space
+    float3 origin = mul(camToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+    
+    // Invert the perspective projection of the view-space position
+    float3 direction = mul(camInvProj, float4(uv, 0.0f, 1.0f)).xyz;
+
+    // Transform the direction from camera to world space and normalize
+    direction = mul(camToWorld, float4(direction, 0.0f)).xyz;
+    direction = normalize(direction);
+    
+    return newRay(origin, direction);
+}
+
+struct Sphere {
+    float3 center;
+    float radius;
+};
+
+Sphere newSphere(float3 center, float radius) {
+    Sphere sphere;
+    sphere.center = center;
+    sphere.radius = radius;
+
+    return sphere;
+}
+
+struct Box {
+    float3 center;
+    float3 extents;
+};
+
+Box newBox(float3 center, float3 extents) {
+    Box box;
+    box.center = center;
+    box.extents = extents;
+
+    return box;
+}
+
+struct Torus {
+    float3 center;
+    float bigRadius;
+    float smallRadius;
+};
+
+Torus newTorus(float3 center, float bigRadius, float smallRadius) {
+    Torus torus;
+    torus.center = center;
+    torus.bigRadius = bigRadius;
+    torus.smallRadius = smallRadius;
+
+    return torus;
+}
+
+float diffuse(float3 l, float3 n) {
+    return dot(normalize(l), normalize(n));
+}
+
+float maxcomp(float3 v) {
+    return max(v.x, max(v.y, v.z));
+}
+
+float sdfSphere(float3 p, Sphere sphere) {
+    return length(p - sphere.center) - sphere.radius;
+}
+
+float sdfBox(float3 p, Box box) {
+    float3 localP = p - box.center;    
+    float3 q = abs(localP) - box.extents;
+
+    return length(max(q, 0)) + min(maxcomp(q), 0);
+}
+
+float sdfTorus(float3 p, Torus torus) {
+    float3 localP = p - torus.center;
+    float dX = length(localP.xz) - torus.bigRadius;
+
+    return length(float2(dX, localP.y)) - torus.smallRadius;
+}
+
+float3 raymarch(Ray ray, Sphere sphere, Box box, Torus torus) {
+    float traveledDistance = 0;
+    const int NUMBER_OF_STEPS = 128;
+    const float MINIMUM_HIT_DISTANCE = 0.001;
+    const float MAXIMUM_TRACE_DISTANCE = 1000;
+
+    for (int i = 0; i < NUMBER_OF_STEPS; ++i) {
+        float3 currPos = ray.origin + traveledDistance * ray.direction;
+
+        float displacement = sin(freq * currPos.x + time) * sin(freq * currPos.y + time) * sin(freq * currPos.z + time) * 0.25;
+        displacement *= spectrumMax;
+
+        float sdf = 0;
+        if (shapeIndex == 0)
+            sdf = sdfSphere(currPos, sphere);
+        else if (shapeIndex == 1)
+            sdf = sdfBox(currPos, box);
+        else if (shapeIndex == 2)
+            sdf = sdfTorus(currPos, torus);
+
+        float closestDistance = sdf + displacement;
+
+        // Hit
+        if (closestDistance < MINIMUM_HIT_DISTANCE) {
+            float diffuseFactor = 0;
+            if (shapeIndex == 0)
+                diffuseFactor = diffuse(light, normalize(sphere.center - currPos));
+            else if (shapeIndex == 1)
+                diffuseFactor = diffuse(light, normalize(box.center - currPos));
+            else if (shapeIndex == 2)
+                diffuseFactor = diffuse(light, normalize(torus.center - currPos));
+
+            return float3(0, 1, 1) * diffuseFactor;
+        }
+
+        // Miss
+        if (traveledDistance > MAXIMUM_TRACE_DISTANCE) {
+            break;
+        }
+
+        // Increment Traveled Distance
+        traveledDistance += closestDistance;
+    }
+
+    return float3(0, 0, 0);
+}
+
+float resolution;
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID) {
+    // Get RenderTexture dimensions
+    uint width, height;
+    res.GetDimensions(width, height);
+    
+    // uv
+    float2 uv = float2((id.xy + float2(0.5f, 0.5f)) / float2(width, height) * 2.0f - 1.0f);
+    
+    Ray camray = newCamRay(uv);
+    Sphere sphere = newSphere(float3(0, 0, 5), 2);
+    Box box = newBox(float3(0, 0, 5), float3(2, 2, 2));
+    Torus torus = newTorus(float3(0, 0, 5), 2, 0.5);
+
+    float3 color = raymarch(camray, sphere, box, torus);
+
+    res[id.xy] = float4(color, 0);
+}
