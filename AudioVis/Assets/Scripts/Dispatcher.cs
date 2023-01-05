@@ -40,6 +40,6 @@ public class Dispatcher : MonoBehaviour {
         computeShader.SetFloat("time", Time.time);
         computeShader.SetVector("light", VisualManager.instance.directionalLight.forward);
         computeShader.SetFloat("freq", VisualManager.instance.wobbleFrequency);
-        computeShader.SetFloat("spectrumMax", AudioManager.instance.isAudioOn ? AudioManager.instance.spectrumMax : 0);
+        computeShader.SetFloat("spectrumMax", AudioManager.instance.isAudioOn ? CSCoreTester.instance.spectrumMax : 0);
     }
 }
