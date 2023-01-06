@@ -1,37 +1,46 @@
 using UnityEngine;
+using CSCore;
+using CSCore.SoundIn;
+using System;
 
 public class AudioManager : MonoBehaviour {
-    public static AudioManager instance { get; private set; }
+	public static AudioManager instance { get; private set; }
 
-    [Range(0, 1)] public float spectrumMax;
+	WasapiLoopbackCapture capture;
+	WaveIn waveIn = new WaveIn();
 
-    // Debug
-    public bool isAudioOn = true;
+	private float[] data;
 
-    void Awake() {
-        if (instance && instance != this)
-            Destroy(this.gameObject);
-        else
-            instance = this;
-    }
+	[Range(0, 1)]
+	public float spectrumMax;
 
-    private void OnAudioFilterRead(float[] data, int channels) {
-        spectrumMax = Mathf.Clamp01(max(data));
-    }
+	private void Awake() {
+		if (instance && instance != this)
+			Destroy(gameObject);
+		else
+			instance = this;
+	}
 
-    private float max(float[] array) {
-        float res = array[0];
-        for (int i = 0; i < array.Length; i++) {
-            if (array[i] > res)
-                res = array[i];
-        }
+	private void Start() {
+		capture = new WasapiLoopbackCapture();
+		capture.Initialize();
 
-        return res;
-    }
+		capture.DataAvailable += (s, e) => {
+			data = new float[e.Data.Length / 4];
+			Buffer.BlockCopy(e.Data, 0, data, 0, e.Data.Length);
+			spectrumMax = Mathf.Clamp01(max(data));
+		};
 
-    void Update(){
-        // Debug
-        if (Input.GetKey(KeyCode.Space))
-            isAudioOn = !isAudioOn;
-    }
+		capture.Start();
+	}
+
+	private float max(float[] array) {
+		float res = array[0];
+		for (int i = 0; i < array.Length; i++) {
+			if (array[i] > res)
+				res = array[i];
+		}
+
+		return res;
+	}
 }

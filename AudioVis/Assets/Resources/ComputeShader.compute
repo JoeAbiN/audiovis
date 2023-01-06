@@ -3,6 +3,7 @@
 float4x4 camToWorld;
 float4x4 camInvProj;
 
+bool is3D;
 int shapeIndex;
 
 float time;
@@ -11,6 +12,8 @@ float freq;
 float spectrumMax;
 
 RWTexture2D<float4> res;
+
+// 3D
 
 struct Ray {
     float3 origin;
@@ -80,6 +83,28 @@ Torus newTorus(float3 center, float bigRadius, float smallRadius) {
     return torus;
 }
 
+// 2D
+
+float lissajous(float2 p, float start, float offset, float w, float d) {
+    float minDist = 1000.;
+    
+    for (float i = start; i < start + offset; i += 0.15) {
+        float2 curvePoint = float2(
+            sin(w*i + d),
+            sin(i)
+        );
+        
+        float currDist = length(p - curvePoint);
+        if(currDist < 0.5) {
+        	minDist = min(minDist, currDist);
+        }
+    }
+    
+    return 1 - minDist;
+}
+
+// Helper
+
 float diffuse(float3 l, float3 n) {
     return dot(normalize(l), normalize(n));
 }
@@ -87,6 +112,8 @@ float diffuse(float3 l, float3 n) {
 float maxcomp(float3 v) {
     return max(v.x, max(v.y, v.z));
 }
+
+// SDF
 
 float sdfSphere(float3 p, Sphere sphere) {
     return length(p - sphere.center) - sphere.radius;
@@ -105,6 +132,8 @@ float sdfTorus(float3 p, Torus torus) {
 
     return length(float2(dX, localP.y)) - torus.smallRadius;
 }
+
+// Logic
 
 float3 raymarch(Ray ray, Sphere sphere, Box box, Torus torus) {
     float traveledDistance = 0;
@@ -164,12 +193,19 @@ void CSMain (uint3 id : SV_DispatchThreadID) {
     // uv
     float2 uv = float2((id.xy + float2(0.5f, 0.5f)) / float2(width, height) * 2.0f - 1.0f);
     
-    Ray camray = newCamRay(uv);
+    Ray camray    = newCamRay(uv);
     Sphere sphere = newSphere(float3(0, 0, 5), 2);
-    Box box = newBox(float3(0, 0, 5), float3(2, 2, 2));
-    Torus torus = newTorus(float3(0, 0, 5), 2, 0.5);
+    Box box       = newBox(float3(0, 0, 5), float3(2, 2, 2));
+    Torus torus   = newTorus(float3(0, 0, 5), 2, 0.5);
 
-    float3 color = raymarch(camray, sphere, box, torus);
+    float3 color = float3(0, 0, 0);
 
+    if (!is3D) {
+        color = float3(lissajous(uv, 0, 40, 0.6, time) + (spectrumMax*0.1), 0, 0);
+	
+    } else {
+        color = raymarch(camray, sphere, box, torus);
+	}
+    
     res[id.xy] = float4(color, 0);
 }

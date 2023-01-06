@@ -5,6 +5,8 @@ using UnityEngine;
 public class VisualManager : MonoBehaviour {
     public static VisualManager instance { get; private set; }
 
+    public bool is3D = true;
+
     public enum Shape {
         Sphere,
         Box,
@@ -18,17 +20,21 @@ public class VisualManager : MonoBehaviour {
 
     void Awake() {
         if (instance && instance != this)
-            Destroy(this.gameObject);
+            Destroy(gameObject);
         else
             instance = this;
     }
 
-    void Update(){
-        if (Input.GetKey(KeyCode.Alpha1) || Input.GetKey(KeyCode.Keypad1))
+    void Update() {
+        if (Input.GetKeyDown(KeyCode.Space)) is3D = !is3D;
+        
+        if (!is3D) return;
+
+        if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1))
             shape = Shape.Sphere;
-        else if (Input.GetKey(KeyCode.Alpha2) || Input.GetKey(KeyCode.Keypad2))
+        else if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2))
             shape = Shape.Box;
-        else if (Input.GetKey(KeyCode.Alpha3) || Input.GetKey(KeyCode.Keypad3))
+        else if (Input.GetKeyDown(KeyCode.Alpha3) || Input.GetKeyDown(KeyCode.Keypad3))
             shape = Shape.Torus;
     }
 }

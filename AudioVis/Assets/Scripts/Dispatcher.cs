@@ -35,11 +35,12 @@ public class Dispatcher : MonoBehaviour {
         computeShader.SetMatrix("camToWorld", Camera.main.cameraToWorldMatrix);
         computeShader.SetMatrix("camInvProj", Camera.main.projectionMatrix.inverse);
 
+        computeShader.SetBool("is3D", VisualManager.instance.is3D);
         computeShader.SetInt("shapeIndex", (int)VisualManager.instance.shape);
         computeShader.SetFloat("resolution", renderTexture.width);
         computeShader.SetFloat("time", Time.time);
         computeShader.SetVector("light", VisualManager.instance.directionalLight.forward);
         computeShader.SetFloat("freq", VisualManager.instance.wobbleFrequency);
-        computeShader.SetFloat("spectrumMax", AudioManager.instance.isAudioOn ? CSCoreTester.instance.spectrumMax : 0);
+        computeShader.SetFloat("spectrumMax", AudioManager.instance.spectrumMax);
     }
 }
